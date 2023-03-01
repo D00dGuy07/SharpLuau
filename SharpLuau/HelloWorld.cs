@@ -1,18 +1,46 @@
 ﻿namespace HelloWorld
 {
-    class Program
+    class Test
     {
-        static void Main(int d, string x)
+        int A;
+        int B;
+
+        public Test(int a)
         {
-            int a = 4;
-            int b = 5;
-            int c = a + b;
+            A = a;
+            B = 3;
         }
 
-        public void Test(int a, int b)
+        public Test(int a, int b)
         {
-            int c = a << b;
-            bool d = a >= b || false;
+            A = a;
+            B = b;
+        }
+
+        public string GetValue(string test) => test;
+        public int GetValue() => A + B;
+
+        public int TestDefault(int value = 9) => value;
+    }
+
+    class Program
+    {
+        static void Print(object message)
+        {
+# luau
+print(message)
+# endluau
+        }
+
+        static int Main()
+        {
+            Test test = new Test(4, 5);
+
+            Print(test.GetValue());
+            Print(test.TestDefault(12));
+            Print(test.TestDefault());
+
+            return 0;
         }
     }
 }

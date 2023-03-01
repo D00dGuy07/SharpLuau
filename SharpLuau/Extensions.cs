@@ -1,4 +1,7 @@
-﻿using Microsoft.CodeAnalysis.CSharp.Syntax;
+﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SharpLuau.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,10 +10,15 @@ using System.Threading.Tasks;
 
 namespace SharpLuau
 {
-    internal static class StringBuilderExtensions
+    internal static class Extensions
     {
-        public static StringBuilder AppendIndented(this StringBuilder stringBuilder, string text, string indentation)
+        // StringBuilder
+
+        public static StringBuilder AppendIndented(this StringBuilder stringBuilder, string? text, string indentation)
         {
+            // Make sure text isn't null
+            text ??= string.Empty;
+
             // For each line, append the indentation and the line to the StringBuilder
             using (StringReader reader = new StringReader(text))
             {
@@ -25,8 +33,11 @@ namespace SharpLuau
             return stringBuilder;
         }
 
-        public static StringBuilder AppendIndented(this StringBuilder stringBuilder, string text, char indentation)
+        public static StringBuilder AppendIndented(this StringBuilder stringBuilder, string? text, char indentation)
         {
+            // Make sure text isn't null
+            text ??= string.Empty;
+
             // For each line, append the indentation and the line to the StringBuilder
             using (StringReader reader = new StringReader(text))
             {
@@ -39,6 +50,21 @@ namespace SharpLuau
             }
 
             return stringBuilder;
+        }
+
+        // SyntaxNode
+        
+        public static T? FirstAncestorOfType<T>(this SyntaxNode node) where T : SyntaxNode
+        {
+            SyntaxNode? currentNode = node.Parent;
+            while (currentNode != null)
+            {
+                if (currentNode is T)
+                    break;
+                currentNode = currentNode.Parent;
+            }
+            
+            return (T?)currentNode;
         }
     }
 }
