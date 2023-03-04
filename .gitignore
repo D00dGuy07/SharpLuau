@@ -366,3 +366,4 @@ FodyWeavers.xsd
 
 LuauInterop
 SharpLuau/LuauInterop.cs
+SharpLuau/Properties/launchSettings.json

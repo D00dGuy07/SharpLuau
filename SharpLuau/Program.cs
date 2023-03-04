@@ -2,35 +2,29 @@
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
+using SharpLuau.Commands;
 using SharpLuau.Syntax;
 using System.Collections.Immutable;
 
 namespace SharpLuau
 {
-	struct CommandLineOptions
-	{
-		[Option("whitespace", "Add whitespace to make the outputted code more readable")]
-		[Alias("w")]
-		public bool Whitespace = true;
-
-		public CommandLineOptions() { }
-	}
-
-	internal class Program
+    internal class Program
 	{
 		static void Main(string[] args)
 		{
 			// Option parsing
-			TrailingFileParser<CommandLineOptions> argsParser = new("SharpLuau");
+			CommandLineParser argsParser = new("SharpLuau");
+			argsParser.RegisterCommand<BuildCommand>("build", "Compile a project");
 
-            CommandLineOptions options = argsParser.Parse(args, out FileInfo[] trailingFiles);
+            argsParser.Parse(args);
+			return;
 
 			var watch = new System.Diagnostics.Stopwatch();
 			watch.Start();
 
 			// Preprocess the file
 
-			string fileText = File.ReadAllText(trailingFiles.First().FullName);
+			string fileText = File.ReadAllText("D:\\dev\\CSharpResearch\\SharpLuau\\SharpLuau\\HelloWorld.cs");
 			var directives = CustomPreprocessor.PreprocessText(fileText, out string programText);
 
 			// Compile the file and get the information about it
@@ -54,7 +48,7 @@ namespace SharpLuau
 			// Convert the tree
 
 			LuauSyntaxConverter converter = new(model);
-			converter.IncludeNewlines = options.Whitespace;
+			converter.IncludeNewlines = true;
 			converter.AddDirectives(directives, root);
 			converter.ConvertTree(tree);
 
