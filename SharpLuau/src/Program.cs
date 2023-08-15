@@ -2,9 +2,11 @@
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
+using SharpLuau.Compilation;
 using SharpLuau.Commands;
-using SharpLuau.Syntax;
+using SharpLuau.Compilation.Syntax;
 using System.Collections.Immutable;
+using System.Reflection;
 
 namespace SharpLuau
 {
@@ -32,7 +34,7 @@ namespace SharpLuau
 			SyntaxTree tree = CSharpSyntaxTree.ParseText(programText);
 
 			var compilation = CSharpCompilation.Create("Compilation")
-				.AddReferences(MetadataReference.CreateFromFile("C:\\Program Files\\dotnet\\packs\\Microsoft.NETCore.App.Ref\\6.0.12\\ref\\net6.0\\System.Runtime.dll"))
+				.AddReferences(MetadataReference.CreateFromFile(Assembly.GetAssembly(typeof(int))?.Location ?? ""))
 				.AddSyntaxTrees(tree);
 
 			SemanticModel model = compilation.GetSemanticModel(tree);
@@ -47,10 +49,10 @@ namespace SharpLuau
 
 			// Convert the tree
 
-			LuauSyntaxConverter converter = new(model);
+			LuauSyntaxConverter converter = new();
 			converter.IncludeNewlines = true;
-			converter.AddDirectives(directives, root);
-			converter.ConvertTree(tree);
+			converter.SetDirectives(directives, root);
+			converter.ConvertTree(tree, model);
 
 			LuauBlock block = converter.GetConvertedCode().First();
 

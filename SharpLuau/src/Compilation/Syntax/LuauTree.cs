@@ -7,7 +7,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SharpLuau.Syntax
+namespace SharpLuau.Compilation.Syntax
 {
     internal enum StatementKind
     {
@@ -38,7 +38,7 @@ namespace SharpLuau.Syntax
         public StatementKind Kind { get; protected set; }
         public Guid Guid { get; protected set; }
         public LuauStatement? Parent;
-        
+
 
         public LuauStatement() { Guid = Guid.NewGuid(); }
     }
@@ -49,7 +49,7 @@ namespace SharpLuau.Syntax
 
         public bool Equals(LuauStatement? x, LuauStatement? y)
         {
-            return (x != null && y != null) ? x.Guid == y.Guid : false;
+            return x != null && y != null ? x.Guid == y.Guid : false;
         }
 
         public int GetHashCode([DisallowNull] LuauStatement obj)
@@ -142,17 +142,17 @@ namespace SharpLuau.Syntax
             }
         }
 
-        public override string? ToString() => String.Join('\n', Statements);
+        public override string? ToString() => string.Join('\n', Statements);
     }
 
     internal sealed class LuauNewline : LuauStatement
     {
-        public LuauNewline() 
+        public LuauNewline()
         {
             Kind = StatementKind.NewLine;
         }
 
-        public override string? ToString() => String.Empty;
+        public override string? ToString() => string.Empty;
     }
 
     internal sealed class LuauComment : LuauStatement
@@ -165,7 +165,7 @@ namespace SharpLuau.Syntax
             Text = text;
         }
 
-        public override string? ToString() => "-- " + Text ;
+        public override string? ToString() => "-- " + Text;
     }
 
     internal sealed class LuauSourceSplice : LuauStatement
@@ -194,9 +194,9 @@ namespace SharpLuau.Syntax
         public override string? ToString()
         {
             if (Expression != null)
-                return String.Format("local {0} = {1}", Identifier, Expression);
+                return string.Format("local {0} = {1}", Identifier, Expression);
             else
-                return String.Format("local {0}", Identifier);
+                return string.Format("local {0}", Identifier);
         }
     }
 
@@ -206,12 +206,15 @@ namespace SharpLuau.Syntax
         public List<LuauIdentifier> ParameterList;
 
         private LuauBlock m_Body;
-        public LuauBlock Body { get { return m_Body; } set
+        public LuauBlock Body
+        {
+            get { return m_Body; }
+            set
             {
                 m_Body.Parent = null;
                 m_Body = value;
                 m_Body.Parent = this;
-            } 
+            }
         }
 
         public LuauGlobalFunctionDeclaration()
@@ -227,7 +230,7 @@ namespace SharpLuau.Syntax
         {
             StringBuilder builder = new();
 
-            builder.AppendFormat("function {0}({1}) \n", Identifier, String.Join(", ", ParameterList));
+            builder.AppendFormat("function {0}({1}) \n", Identifier, string.Join(", ", ParameterList));
             builder.AppendIndented(Body.ToString(), '\t');
             builder.Append("end");
 
@@ -265,7 +268,7 @@ namespace SharpLuau.Syntax
         {
             StringBuilder builder = new();
 
-            builder.AppendFormat("local function {0}({1}) \n", Identifier, String.Join(", ", ParameterList));
+            builder.AppendFormat("local function {0}({1}) \n", Identifier, string.Join(", ", ParameterList));
             builder.AppendIndented(Body.ToString(), '\t');
             builder.Append("end");
 
@@ -285,7 +288,7 @@ namespace SharpLuau.Syntax
             Kind = StatementKind.ExpressionStatement;
         }
 
-        public override string ToString() => String.Format("return {0}", Expression);
+        public override string ToString() => string.Format("return {0}", Expression);
     }
 
     internal sealed class LuauExpressionStatement : LuauStatement
@@ -329,9 +332,11 @@ namespace SharpLuau.Syntax
         public void SetElse(LuauStatement statement)
         {
             if (statement.Kind != StatementKind.If && statement.Kind != StatementKind.Block)
-            { throw new ArgumentException("LuauIfStatement else clause requires either another IfStatement or a Block. Got: " +
-               statement.Kind.ToString()); }
-            
+            {
+                throw new ArgumentException("LuauIfStatement else clause requires either another IfStatement or a Block. Got: " +
+               statement.Kind.ToString());
+            }
+
             Else = statement;
             Else.Parent = this;
         }
@@ -375,9 +380,11 @@ namespace SharpLuau.Syntax
 
         public LuauAssignmentStatement(StatementKind kind)
         {
-            if (kind < StatementKind.SimpleAssignment || kind > StatementKind.ConcatenateAssignment) 
-            { throw new ArgumentException("LuauAssignmentStatement requires an assignment StatementKind. Got: " +
-                kind.ToString()); }
+            if (kind < StatementKind.SimpleAssignment || kind > StatementKind.ConcatenateAssignment)
+            {
+                throw new ArgumentException("LuauAssignmentStatement requires an assignment StatementKind. Got: " +
+                kind.ToString());
+            }
             Kind = kind;
 
             Left = LuauQualifiedIdentifier.Empty;
@@ -389,21 +396,21 @@ namespace SharpLuau.Syntax
             switch (Kind)
             {
                 case StatementKind.SimpleAssignment:
-                    return String.Format("{0} = {1}", Left, Right);
+                    return string.Format("{0} = {1}", Left, Right);
                 case StatementKind.AddAssignment:
-                    return String.Format("{0} += {1}", Left, Right);
+                    return string.Format("{0} += {1}", Left, Right);
                 case StatementKind.SubtractAssignment:
-                    return String.Format("{0} -= {1}", Left, Right);
+                    return string.Format("{0} -= {1}", Left, Right);
                 case StatementKind.MultiplyAssignment:
-                    return String.Format("{0} *= {1}", Left, Right);
+                    return string.Format("{0} *= {1}", Left, Right);
                 case StatementKind.DivideAssignment:
-                    return String.Format("{0} /= {1}", Left, Right);
+                    return string.Format("{0} /= {1}", Left, Right);
                 case StatementKind.ModuloAssignment:
-                    return String.Format("{0} %= {1}", Left, Right);
+                    return string.Format("{0} %= {1}", Left, Right);
                 case StatementKind.ExponentAssignment:
-                    return String.Format("{0} ^= {1}", Left, Right);
+                    return string.Format("{0} ^= {1}", Left, Right);
                 case StatementKind.ConcatenateAssignment:
-                    return String.Format("{0} ..= {1}", Left, Right);
+                    return string.Format("{0} ..= {1}", Left, Right);
                 default:
                     return null;
             }
@@ -452,7 +459,7 @@ namespace SharpLuau.Syntax
         BinaryGreaterThanOrEqual,
     }
 
-    internal class LuauExpression 
+    internal class LuauExpression
     {
         public ExpressionKind Kind { get; protected set; }
 
@@ -476,15 +483,15 @@ namespace SharpLuau.Syntax
         public LuauTernary(LuauExpression condition, LuauExpression value, LuauExpression alternative)
         {
             Kind = ExpressionKind.Ternary;
-            
+
             Condition = condition;
             Value = value;
-            Alternative= alternative;
+            Alternative = alternative;
         }
 
         public override bool DoesSomething() => Condition.DoesSomething() || Value.DoesSomething() || Alternative.DoesSomething();
 
-        public override string ToString() => String.Format("if {0} then {1} else {2}", Condition, Value, Alternative);
+        public override string ToString() => string.Format("if {0} then {1} else {2}", Condition, Value, Alternative);
     }
 
     internal sealed class LuauMemberAccess : LuauExpression
@@ -501,7 +508,7 @@ namespace SharpLuau.Syntax
             IsMethod = isMethod;
         }
 
-        public override string ToString() => String.Format("{0}{1}{2}", Expression, IsMethod ? ':' : ".", Member);
+        public override string ToString() => string.Format("{0}{1}{2}", Expression, IsMethod ? ':' : ".", Member);
     }
 
     internal sealed class LuauInvocation : LuauExpression
@@ -518,7 +525,7 @@ namespace SharpLuau.Syntax
 
         public override bool DoesSomething() => true;
 
-        public override string ToString() => String.Format("{0}({1})", Identifier, String.Join(", ", Arguments));
+        public override string ToString() => string.Format("{0}({1})", Identifier, string.Join(", ", Arguments));
     }
 
     internal sealed class LuauIdentifier : LuauExpression
@@ -572,7 +579,7 @@ namespace SharpLuau.Syntax
             Kind = ExpressionKind.QualifiedIdentifier;
 
             Identifiers = new();
-            IsMemberMethod= false;
+            IsMemberMethod = false;
         }
 
         public override string? ToString()
@@ -588,7 +595,7 @@ namespace SharpLuau.Syntax
                 return builder.ToString();
             }
             else
-                return String.Join('.', Identifiers);
+                return string.Join('.', Identifiers);
 
         }
 
@@ -614,7 +621,7 @@ namespace SharpLuau.Syntax
         {
             StringBuilder builder = new();
 
-            builder.AppendFormat("function({0}) \n", String.Join(", ", ParameterList));
+            builder.AppendFormat("function({0}) \n", string.Join(", ", ParameterList));
             builder.AppendIndented(Body.ToString(), '\t');
             builder.Append("\nend");
 
@@ -635,7 +642,7 @@ namespace SharpLuau.Syntax
 
         public override string ToString()
         {
-            return String.Format("({0})", Expression);
+            return string.Format("({0})", Expression);
         }
     }
 
@@ -643,19 +650,23 @@ namespace SharpLuau.Syntax
     {
         public string? Text;
 
-        public LuauLiteralExpression(ExpressionKind kind) 
+        public LuauLiteralExpression(ExpressionKind kind)
         {
-            if (kind < ExpressionKind.TrueLiteral || kind > ExpressionKind.NilLiteral) 
-            { throw new ArgumentException("LuauLiteralExpression with no data has to be a keyword literal expression. Got: " +
-                kind.ToString()); }
+            if (kind < ExpressionKind.TrueLiteral || kind > ExpressionKind.NilLiteral)
+            {
+                throw new ArgumentException("LuauLiteralExpression with no data has to be a keyword literal expression. Got: " +
+                kind.ToString());
+            }
             Kind = kind;
         }
 
         public LuauLiteralExpression(ExpressionKind kind, string text)
         {
             if (kind < ExpressionKind.NumericLiteral || kind > ExpressionKind.CharacterLiteral)
-            { throw new ArgumentException("LuauLiteralExpression with text data has to be either a string, " +
-                "a number or a character. Got" + kind.ToString()); }
+            {
+                throw new ArgumentException("LuauLiteralExpression with text data has to be either a string, " +
+                "a number or a character. Got" + kind.ToString());
+            }
             Kind = kind;
             Text = text;
         }
@@ -729,8 +740,10 @@ namespace SharpLuau.Syntax
         public LuauUnaryExpression(ExpressionKind kind, LuauExpression expression)
         {
             if (kind < ExpressionKind.UnaryPlus || kind > ExpressionKind.UnaryLogicalNot)
-            { throw new ArgumentException("LuauUnaryExpression kind has to be a unary expression. Got " + 
-                kind.ToString()); }
+            {
+                throw new ArgumentException("LuauUnaryExpression kind has to be a unary expression. Got " +
+                kind.ToString());
+            }
             Kind = kind;
 
             Expression = expression;
@@ -762,8 +775,10 @@ namespace SharpLuau.Syntax
         public LuauBinaryExpression(ExpressionKind kind, LuauExpression left, LuauExpression right)
         {
             if (kind < ExpressionKind.NumericLiteral || kind > ExpressionKind.BinaryGreaterThanOrEqual)
-            { throw new ArgumentException("LuauBinaryExpression kind has to be a binary expression. Got: " +
-                kind.ToString()); }
+            {
+                throw new ArgumentException("LuauBinaryExpression kind has to be a binary expression. Got: " +
+                kind.ToString());
+            }
             Kind = kind;
 
             Left = left;
@@ -777,33 +792,33 @@ namespace SharpLuau.Syntax
             switch (Kind)
             {
                 case ExpressionKind.BinaryAdd:
-                    return String.Format("{0} + {1}", Left, Right);
+                    return string.Format("{0} + {1}", Left, Right);
                 case ExpressionKind.BinarySubtract:
-                    return String.Format("{0} - {1}", Left, Right);
+                    return string.Format("{0} - {1}", Left, Right);
                 case ExpressionKind.BinaryMultiply:
-                    return String.Format("{0} * {1}", Left, Right);
+                    return string.Format("{0} * {1}", Left, Right);
                 case ExpressionKind.BinaryDivide:
-                    return String.Format("{0} / {1}", Left, Right);
+                    return string.Format("{0} / {1}", Left, Right);
                 case ExpressionKind.BinaryModulo:
-                    return String.Format("{0} % {1}", Left, Right);
+                    return string.Format("{0} % {1}", Left, Right);
                 case ExpressionKind.BinaryConcatenate:
-                    return String.Format("{0} .. {1}", Left, Right);
+                    return string.Format("{0} .. {1}", Left, Right);
                 case ExpressionKind.BinaryLogicalOr:
-                    return String.Format("{0} or {1}", Left, Right);
+                    return string.Format("{0} or {1}", Left, Right);
                 case ExpressionKind.BinaryLogicalAnd:
-                    return String.Format("{0} and {1}", Left, Right);
+                    return string.Format("{0} and {1}", Left, Right);
                 case ExpressionKind.BinaryEquals:
-                    return String.Format("{0} == {1}", Left, Right);
+                    return string.Format("{0} == {1}", Left, Right);
                 case ExpressionKind.BinaryNotEquals:
-                    return String.Format("{0} ~= {1}", Left, Right);
+                    return string.Format("{0} ~= {1}", Left, Right);
                 case ExpressionKind.BinaryLessThan:
-                    return String.Format("{0} < {1}", Left, Right);
+                    return string.Format("{0} < {1}", Left, Right);
                 case ExpressionKind.BinaryLessThanOrEqual:
-                    return String.Format("{0} <= {1}", Left, Right);
+                    return string.Format("{0} <= {1}", Left, Right);
                 case ExpressionKind.BinaryGreaterThan:
-                    return String.Format("{0} > {1}", Left, Right);
+                    return string.Format("{0} > {1}", Left, Right);
                 case ExpressionKind.BinaryGreaterThanOrEqual:
-                    return String.Format("{0} >= {1}", Left, Right);
+                    return string.Format("{0} >= {1}", Left, Right);
                 default:
                     return null;
             }

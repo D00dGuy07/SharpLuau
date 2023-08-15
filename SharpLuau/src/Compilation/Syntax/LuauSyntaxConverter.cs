@@ -13,12 +13,13 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using SharpLuau.Compilation;
 
-namespace SharpLuau.Syntax
+namespace SharpLuau.Compilation.Syntax
 {
     internal class LuauSyntaxConverter
     {
-        private SemanticModel m_SemanticModel;
+        private SemanticModel? m_SemanticModel;
 
         // Namespace data cache
         internal class NamespaceData
@@ -45,10 +46,8 @@ namespace SharpLuau.Syntax
         // Options
         public bool IncludeNewlines = true;
 
-        public LuauSyntaxConverter(SemanticModel model)
+        public LuauSyntaxConverter()
         {
-            m_SemanticModel = model;
-
             m_NamespaceCache = new(SymbolEqualityComparer.Default);
 
             m_OverloadCounters = new(SymbolEqualityComparer.Default);
@@ -87,10 +86,13 @@ namespace SharpLuau.Syntax
 
         // Preprocessor directive handling
 
-        public void AddDirectives(List<PreprocessorDirective> directives, CompilationUnitSyntax root)
+        public void SetDirectives(PreprocessorDirective[] directives, CompilationUnitSyntax root)
         {
+            // Clear necessary state
+            m_SpliceLocations.Clear();
+
             // Setup processing for each directive
-            foreach (var directive in directives)
+            foreach (PreprocessorDirective directive in directives)
             {
                 switch (directive.Kind)
                 {
@@ -115,8 +117,14 @@ namespace SharpLuau.Syntax
 
         // Statement Syntax Conversions
 
-        public void ConvertTree(SyntaxTree tree)
+        public void ConvertTree(SyntaxTree tree, SemanticModel model)
         {
+            // Clear the cache
+            m_NamespaceCache.Clear();
+
+            // Set the semantic model for this tree
+            m_SemanticModel = model;
+
             // Get the root of the tree
             var root = tree.GetCompilationUnitRoot();
 
