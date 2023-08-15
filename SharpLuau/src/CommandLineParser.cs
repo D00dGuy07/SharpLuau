@@ -141,7 +141,15 @@ namespace SharpLuau
 			if (commandStructure != null) 
 			{
 				MethodInfo? method = commandType.GetMethod("OnRun", new Type[] { typeof(object) });
-				method?.Invoke(commandStructure, new object?[] { globalOptions });
+
+				try
+				{
+					method?.Invoke(commandStructure, new object?[] { globalOptions });
+				} catch (TargetInvocationException e)
+				{
+					Console.WriteLine(e.InnerException);
+				}
+				
 			}
 		}
 

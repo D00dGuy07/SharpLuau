@@ -46,6 +46,8 @@ namespace SharpLuau.Compilation
 				.AddReferences(MetadataReference.CreateFromFile(Assembly.GetAssembly(typeof(int))?.Location ?? ""))
 				.AddSyntaxTrees(trees);
 
+            Console.WriteLine(Assembly.GetAssembly(typeof(int))?.Location);
+
             DirectoryInfo outputDirectory = new DirectoryInfo(m_Options.OutputDirectory);
             if (!outputDirectory.Exists)
                 outputDirectory.Create();
