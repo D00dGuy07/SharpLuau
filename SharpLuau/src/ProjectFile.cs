@@ -12,7 +12,7 @@ using Tomlyn.Syntax;
 
 namespace SharpLuau
 {
-    internal class ProjectFile
+    public class ProjectFile
     {
         private class TomlCamelCaseConverter
         {
@@ -44,18 +44,34 @@ namespace SharpLuau
             }
         }
 
-        public List<string> Files { get; private set; }
+        /// <summary>
+        /// The list of files to be compiled
+        /// </summary>
+        public List<string> Files { get; private set; } = new();
 
+        /// <summary>
+        /// The path where lua files should be written to
+        /// </summary>
         [DataMember(Name = "outputPath")]
-        public string? OutputPath { get; set; }
+        public string? OutputPath { get; set; } = "build";
 
-        public bool? IncludeNewlines { get; set; }
+        /// <summary>
+        /// The path where intermediate files are written
+        /// </summary>
+		[DataMember(Name = "intermediatePath")]
+        public string? IntermediatePath { get; set; } = "build-int";
+
+        /// <summary>
+        /// Whether or not to include whitespace in the final output
+        /// </summary>
+        public bool? IncludeNewlines { get; set; } = true;
 
         public ProjectFile()
         {
-            Files = new List<string>();
-            OutputPath = "build";
-            IncludeNewlines = true;
+            //Files = new List<string>();
+            //OutputPath = "build";
+            //IntermediatePath = "build-int";
+            //IncludeNewlines = true;
         }
 
         public static ProjectFile? Parse(FileInfo file)
@@ -77,20 +93,22 @@ namespace SharpLuau
 
             // Get the actual list of files and not just the patterns
             if (model != null)
-                model.Files = ExpandFileGlobs(model.Files);
+                model.Files = ExpandFileGlobs(model.Files, file);
 
             return model;
         }
 
-        private static List<string> ExpandFileGlobs(List<string> files)
+        private static List<string> ExpandFileGlobs(List<string> files, FileInfo projectFile)
         {
             // Run the pattern matcher
             Matcher matcher = new();
             matcher.AddIncludePatterns(files);
-            PatternMatchingResult result = matcher.Execute(new DirectoryInfoWrapper(new(Directory.GetCurrentDirectory())));
+
+            // The project file directory should never actually be null, but in case it is, the working directory is used
+            PatternMatchingResult result = matcher.Execute(new DirectoryInfoWrapper(projectFile.Directory ?? new(Directory.GetCurrentDirectory())));
 
             // Get the paths from the pattern match structure
-            List<string> matchedPaths = new List<string>(result.Files.Count());
+            List<string> matchedPaths = new(result.Files.Count());
             foreach (FilePatternMatch match in result.Files)
                 matchedPaths.Add(match.Path);
 

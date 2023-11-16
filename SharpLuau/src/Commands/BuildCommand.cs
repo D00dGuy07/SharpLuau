@@ -28,10 +28,11 @@ namespace SharpLuau.Commands
 				Console.WriteLine(path);
 			Console.WriteLine();
 
-			TranspilerOptions options = new TranspilerOptions
+			TranspilerOptions options = new()
 			{
-				IncludeNewlines = settings.IncludeNewlines ?? false,
-				OutputDirectory = settings.OutputPath ?? $"{RootFolder.FullName}/build"
+				IncludeNewlines = settings.IncludeNewlines ?? true,
+				OutputDirectory = new DirectoryInfo(settings.OutputPath ?? string.Empty),
+				IntermediateDirectory = new DirectoryInfo(settings.IntermediatePath ?? string.Empty)
 			};
 
 			Transpiler transpiler = new Transpiler(options);
