@@ -32,7 +32,30 @@ namespace SharpLuau.Compilation.Syntax
 				renamedSymbols.Add(symbolName, ParseIdentifier(reader));
 			}
 
-			return new(renamedSymbols);
+			// Read all of the output file relations
+			Dictionary<string, string> typeToOutputFile = new();
+			int typeToOutputFileCount = reader.ReadInt32();
+			for (int i = 0; i < typeToOutputFileCount; i++)
+				typeToOutputFile.Add(reader.ReadString(), reader.ReadString());
+
+			// Read all of the roblox path relations
+			Dictionary<string, RobloxObjectPath> outputFileToRobloxPath = new();
+			int outputFileToRobloxPathCount = reader.ReadInt32();
+			for (int i = 0; i < outputFileToRobloxPathCount; i++)
+			{
+				string outputFilePath = reader.ReadString();
+
+				string service = reader.ReadString();
+
+				int pathLength = reader.ReadInt32();
+				string[] path = new string[pathLength];
+				for (int j = 0; j < pathLength; j++)
+					path[j] = reader.ReadString();
+
+				outputFileToRobloxPath.Add(outputFilePath, new(service, path));
+			}
+
+			return new(renamedSymbols, typeToOutputFile, outputFileToRobloxPath);
 		}
 
 		public static LuauBlock ParseCode(BinaryReader reader)
@@ -55,6 +78,7 @@ namespace SharpLuau.Compilation.Syntax
 			Return = 8,
 			ExpressionStatement = 9,
 			If = 10,
+			Import = 11,
 
 			// Assignment Statements
 			SimpleAssignment = 101,
@@ -79,6 +103,7 @@ namespace SharpLuau.Compilation.Syntax
 			Lambda = 6,
 			ParenthesizedExpression = 7,
 			DynamicIdentifier = 8,
+			TableItem = 9,
 
 			// Literal Expressions
 			NumericLiteral = 101,
@@ -140,6 +165,8 @@ namespace SharpLuau.Compilation.Syntax
 					return ParseExpressionStatement(reader);
 				case StatementKindV1.If:
 					return ParseIfStatement(reader);
+				case StatementKindV1.Import:
+					return ParseImportStatement(reader);
 				case StatementKindV1.SimpleAssignment:
 				case StatementKindV1.AddAssignment:
 				case StatementKindV1.SubtractAssignment:
@@ -255,6 +282,17 @@ namespace SharpLuau.Compilation.Syntax
 			return ifStatement;
 		}
 
+		private static LuauImportStatement ParseImportStatement(BinaryReader reader)
+		{
+			List<string> symbols = new();
+
+			int symbolCount = reader.ReadInt32();
+			for (int i = 0; i < symbolCount; i++)
+				symbols.Add(reader.ReadString());
+
+			return new(symbols);
+		}
+
 		private static LuauAssignmentStatement ParseAssignment(BinaryReader reader, StatementKindV1 kind)
 		{
 			// This function won't check that the kind is a valid assignment kind
@@ -286,6 +324,8 @@ namespace SharpLuau.Compilation.Syntax
 					return ParseIdentifier(reader);
 				case ExpressionKindV1.DynamicIdentifier:
 					return ParseDynamicIdentifier(reader);
+				case ExpressionKindV1.TableItem:
+					return ParseTableItem(reader);
 				case ExpressionKindV1.QualifiedIdentifier:
 					return ParseQualifiedIdentifier(reader);
 				case ExpressionKindV1.Lambda:
@@ -428,13 +468,29 @@ namespace SharpLuau.Compilation.Syntax
 			return new LuauLiteralExpression((ExpressionKind)kind);
 		}
 
+		private static LuauTableItemExpression ParseTableItem(BinaryReader reader)
+		{
+			LuauExpression value = ParseExpression(reader);
+			LuauExpression? key = null;
+
+			if (reader.ReadBoolean())
+				key = ParseExpression(reader);
+
+			return new LuauTableItemExpression(value, key);
+		}
+
 		private static LuauTableExpression ParseTable(BinaryReader reader)
 		{
-			List<LuauExpression> contents = new();
+			List<LuauTableItemExpression> contents = new();
+
+			bool ShouldSpread = reader.ReadBoolean();
 
 			int length = reader.ReadInt32();
 			for (int i = 0; i < length; i++)
-				contents.Add(ParseExpression(reader));
+			{
+				reader.ReadInt32(); // Skip Header
+				contents.Add(ParseTableItem(reader));
+			}
 
 			return new LuauTableExpression(contents);
 		}

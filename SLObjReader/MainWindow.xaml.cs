@@ -50,7 +50,7 @@ namespace SLObjReader
 			filesPanel.Children.Clear();
 			foreach (string filePath in args.ProjectFile.Files)
 			{
-				FileInfo fileInfo = Transpiler.GetIntermediatePath(filePath, new(args.ProjectFile.IntermediatePath));
+				FileInfo fileInfo = Transpiler.GetObjectPath(filePath, new(args.ProjectFile.IntermediatePath));
 				if (fileInfo.Exists)
 					filesPanel.Children.Add(new SLObjFileButton(fileInfo) { Margin = new Thickness(0.0, 0.0, 0.0, 5.0) });
 			}

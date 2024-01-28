@@ -1,24 +1,12 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Numerics;
-using System.Reflection.Metadata;
-using System.Runtime.CompilerServices;
-using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
-using SharpLuau.Compilation;
 
 namespace SharpLuau.Compilation.Syntax
 {
 	/// <summary>
-	/// This class stores the output of transpilation for each individual file
+	/// This struct stores the output of transpilation for each individual file
 	/// </summary>
 	internal struct FileConversionData
 	{
@@ -32,10 +20,22 @@ namespace SharpLuau.Compilation.Syntax
 		/// </summary>
 		public LuauContext CompilationContext;
 
+		/// <summary>
+		/// The output file that this conversion was based off of
+		/// </summary>
+		public FileInfo? OutputFile;
+
+		/// <summary>
+		/// The Roblox object path that this conversion was based off of
+		/// </summary>
+		public RobloxObjectPath ObjectPath;
+
 		public FileConversionData()
 		{
 			ConvertedCode = new();
 			CompilationContext = new();
+			OutputFile = null;
+			ObjectPath = new();
 		}
 	}
 
@@ -56,11 +56,20 @@ namespace SharpLuau.Compilation.Syntax
 			// Directive tables
 			public Dictionary<SyntaxNode, LuauSpliceDirective> SpliceLocations;
 
+			// Types to be exported by this module
+			public List<INamedTypeSymbol> TypesToExport;
+
+			// Types used by this module
+			public Dictionary<INamedTypeSymbol, bool> TypesReferenced;
+
 			public FileConversionState()
 			{
 				OverloadCounters = new(SymbolEqualityComparer.Default);
 				AssignedTempValues = new();
 				SpliceLocations = new();
+
+				TypesToExport = new();
+				TypesReferenced = new(SymbolEqualityComparer.Default);
 			}
 		}
 		private FileConversionState m_State;
@@ -122,10 +131,17 @@ namespace SharpLuau.Compilation.Syntax
 
 		// Statement Syntax Conversions
 
-		public FileConversionData ConvertFile(SyntaxTree tree, PreprocessorDirective[] directives, SemanticModel model)
+		public FileConversionData ConvertFile(SyntaxTree tree, PreprocessorDirective[] directives, SemanticModel model, FileInfo outputFile, RobloxObjectPath robloxObjectPath)
 		{
 			// Reset state
-			m_FileConversionData = new();
+			m_FileConversionData = new()
+			{
+				OutputFile = outputFile,
+				ObjectPath = robloxObjectPath,
+			};
+
+			m_FileConversionData.CompilationContext.AssignRobloxPathToFile(outputFile, robloxObjectPath);
+
 			m_State = new();
 			m_SemanticModel = model;
 
@@ -151,6 +167,58 @@ namespace SharpLuau.Compilation.Syntax
 				}
 			}
 
+			// Export the types
+
+			LuauTableExpression returnTable = new();
+			returnTable.ShouldSpread = IncludeNewlines;
+
+			LuauReturnStatement returnStatement = new();
+			returnStatement.Expression = returnTable;
+			m_FileConversionData.ConvertedCode.AddLast(returnStatement);
+
+			// Add a newline after all of the type headers
+			// This needs to be added first because inserting at the front reverses the order
+			if (IncludeNewlines)
+				m_FileConversionData.ConvertedCode.AddFirst(new LuauNewline());
+
+			foreach (INamedTypeSymbol typeSymbol in m_State.TypesToExport)
+			{
+				m_State.TypesReferenced[typeSymbol] = false;
+
+				LuauDynamicIdentifier typeName = new(typeSymbol);
+
+				// Add type header with reversed order because it's inserting in the front
+				{
+					// typeName.__index = typeName
+					LuauAssignmentStatement indexAssignment = new(StatementKind.SimpleAssignment);
+					m_FileConversionData.ConvertedCode.AddFirst(indexAssignment);
+
+					indexAssignment.Left = new LuauQualifiedIdentifier(
+						new List<LuauIdentifier> { typeName, "__index" }, false);
+					indexAssignment.Right = typeName;
+
+					// local typeName = {}
+					LuauVariableDeclaration tableAssignment = new();
+					m_FileConversionData.ConvertedCode.AddFirst(tableAssignment);
+
+					tableAssignment.Identifier = typeName;
+					tableAssignment.Expression = new LuauTableExpression();
+				}
+
+				returnTable.Contents.Add(new(typeName, typeName));
+			}
+
+			// After about 5 different versions of this import system in my head I've come up with one
+			// that is so simple that I'm upset
+			List<INamedTypeSymbol> symbolsToImport = new();
+			foreach (var pair in m_State.TypesReferenced)
+			{
+				if (pair.Value == true)
+					symbolsToImport.Add(pair.Key);
+			}
+			if (symbolsToImport.Count > 0)
+				m_FileConversionData.ConvertedCode.AddFirst(new LuauImportStatement(symbolsToImport));
+
 			return m_FileConversionData;
 		}
 
@@ -161,30 +229,11 @@ namespace SharpLuau.Compilation.Syntax
 			if (classSymbol == null)
 				return;
 
+			m_State.TypesToExport.Add(classSymbol);
 			m_Context.AssignSymbolName(classSymbol, classSymbol.Name);
-			LuauDynamicIdentifier className = new(classSymbol);
 
-			// Add class header
-			{
-				// local className = {}
-				LuauVariableDeclaration tableAssignment = new();
-				block.AddLast(tableAssignment);
-
-				tableAssignment.Identifier = className;
-				tableAssignment.Expression = new LuauTableExpression();
-
-				// className.__index = className
-				LuauAssignmentStatement indexAssignment = new(StatementKind.SimpleAssignment);
-				block.AddLast(indexAssignment);
-
-				indexAssignment.Left = new LuauQualifiedIdentifier(
-					new List<LuauIdentifier> { className, "__index" }, false);
-				indexAssignment.Right = className;
-
-				// Newline
-				if (IncludeNewlines)
-					block.AddLast(new LuauNewline());
-			}
+			if (m_FileConversionData.OutputFile == null) throw new Exception();
+			m_Context.AssignTypeToFile(classSymbol, m_FileConversionData.OutputFile);
 
 			// Initializing constructor
 			AddInitializingConstructor(classDecl, block);
@@ -196,6 +245,9 @@ namespace SharpLuau.Compilation.Syntax
 				AddConstructor(ctorDecl, constructorCount, block);
 				constructorCount++;
 			}
+
+			if (constructorCount == 0)
+				m_Context.AssignSymbolName(classSymbol.Constructors.First(), "_initCtor");
 
 			// Initialize method overload counters for this type
 			InitMethodOverloadCounters(classSymbol);
@@ -383,7 +435,7 @@ namespace SharpLuau.Compilation.Syntax
 			int methodOverloadCount = IncrementOverloadCount(methodSymbol.ContainingType, methodSymbol.Name);
 
 			// Add an underscore to the beginning of the name if it's not a public function
-			string methodName = methodSymbol.Name + methodOverloadCount;
+			string methodName = methodOverloadCount > 0 ? methodSymbol.Name + methodOverloadCount : methodSymbol.Name;
 			if (methodSymbol.DeclaredAccessibility != Accessibility.Public)
 				methodName = '_' + methodName;
 			m_Context.AssignSymbolName(methodSymbol, methodName);
@@ -603,7 +655,7 @@ namespace SharpLuau.Compilation.Syntax
 
 			// Get the symbol for the member
 			ISymbol memberSymbol = info.Type.GetMembers(memberAccess.Name.Identifier.Text).First();
-			if (memberSymbol.Kind != SymbolKind.Property) throw new ArgumentException("Member is not a property!");
+			if (memberSymbol.Kind != SymbolKind.Field) throw new ArgumentException("Member is not a property!");
 			
 			// Return the converted expression
 			return new LuauMemberAccess(ConvertExpression(memberAccess.Expression, statement), new LuauDynamicIdentifier(memberSymbol));
@@ -636,7 +688,7 @@ namespace SharpLuau.Compilation.Syntax
 				new LuauMemberAccess(
 					ConvertExpression(memberAccess.Expression, statement),
 					new LuauDynamicIdentifier(methodMatch),
-					true
+					!methodMatch.IsStatic
 				),
 				GetArgumentList(invocation.ArgumentList, statement)
 			);
@@ -652,6 +704,7 @@ namespace SharpLuau.Compilation.Syntax
 
 			INamedTypeSymbol typeSymbol = (INamedTypeSymbol)info.Symbol;
 			LuauDynamicIdentifier typeIdentifier = new(typeSymbol);
+			m_State.TypesReferenced[typeSymbol] = true;
 
 			// Match a constructor to the argument list
 
@@ -674,20 +727,14 @@ namespace SharpLuau.Compilation.Syntax
 				if (matchedConstructor == null)
 				{
 					return new LuauInvocation(
-						new LuauQualifiedIdentifier(
-							new List<LuauIdentifier> { typeIdentifier, "_initCtor" },
-							false
-						),
+						new LuauMemberAccess(typeIdentifier, "_initCtor"),
 						null
 					);
 				}
 
 				// Return an invocation for the parameterless constructor
 				return new LuauInvocation(
-					new LuauQualifiedIdentifier(
-						new List<LuauIdentifier> { typeIdentifier, new LuauDynamicIdentifier(matchedConstructor) },
-						false
-					),
+					new LuauMemberAccess(typeIdentifier, new LuauDynamicIdentifier(matchedConstructor)),
 					null
 				);
 			}
@@ -698,10 +745,7 @@ namespace SharpLuau.Compilation.Syntax
 
 			// Return an invocation for the constructor
 			return new LuauInvocation(
-				new LuauQualifiedIdentifier(
-					new List<LuauIdentifier> { typeIdentifier, new LuauDynamicIdentifier(matchedConstructor) },
-					false
-				),
+				new LuauMemberAccess(typeIdentifier, new LuauDynamicIdentifier(matchedConstructor)),
 				GetArgumentList(objectCreation.ArgumentList, statement)
 			);
 		}
@@ -1127,12 +1171,19 @@ namespace SharpLuau.Compilation.Syntax
 					if (i + 1 <= arguments.Count)
 					{ // There's an argument, so the types have to match
 						// Get the type info of the argument in the i-th position
-						var argument = arguments[i];
-						var typeInfo = m_SemanticModel.GetTypeInfo(argument.Expression);
+						ArgumentSyntax? argument = arguments[i];
+						ITypeSymbol? argumentType = m_SemanticModel.GetTypeInfo(argument.Expression).Type;
+						ITypeSymbol parameterType = method.Parameters[i].Type;
+
+						bool isCompatibleType = false;
+						while (argumentType != null && isCompatibleType == false)
+						{
+							isCompatibleType = SymbolEqualityComparer.Default.Equals(argumentType, parameterType);
+							argumentType = argumentType.BaseType;
+						}
 
 						// If the type info doesn't match the i-th parameter of the constructor then skip to the next constructor
-						if (typeInfo.Type == null ||
-							!SymbolEqualityComparer.Default.Equals(typeInfo.Type, method.Parameters[i].Type))
+						if (!isCompatibleType)
 						{
 							isMatch = false;
 							break;

@@ -23,6 +23,7 @@ namespace SharpLuau.Commands
 
 			ProjectFile? settings = ProjectFile.Parse(projectFile);
 			if (settings == null || settings.Files.Count < 1) { return; }
+			Directory.SetCurrentDirectory(RootFolder.FullName);
 
 			foreach (string path in settings.Files)
 				Console.WriteLine(path);
@@ -35,13 +36,8 @@ namespace SharpLuau.Commands
 				IntermediateDirectory = new DirectoryInfo(settings.IntermediatePath ?? string.Empty)
 			};
 
-			Transpiler transpiler = new Transpiler(options);
+			Transpiler transpiler = new(options);
 			transpiler.Transpile(settings.Files);
-
-			/*
-			Assembly? file = Assembly.GetAssembly(typeof(int));
-			Console.WriteLine(file != null ? file.FullName : "Failed");
-			*/
 		}
 	}
 }

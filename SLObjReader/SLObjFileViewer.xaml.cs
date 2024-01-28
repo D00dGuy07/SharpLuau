@@ -16,6 +16,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using SharpLuau.Compilation;
 
 namespace SLObjReader
 {
@@ -135,6 +136,8 @@ namespace SLObjReader
 				using FileStream fileStream = File.OpenRead(fileInfo.FullName);
 				using BinaryReader reader = new(fileStream, Encoding.UTF8);
 
+				// I don't really want to show the header right now because I'm lazy
+				SLOBJHeader.ReadBinary(reader);
 				m_Context = SLOBJParserV1.ParseContext(reader);
 				m_Block = SLOBJParserV1.ParseCode(reader);
 			}
@@ -180,7 +183,8 @@ namespace SLObjReader
 			};
 			contextNode.Items.Add(dynamicIdentifiersNode);
 
-			foreach (var pair in m_Context.GetDynamicIdentifiersDictionary())
+			Dictionary<string, LuauIdentifier> dynamicIdentifiers = m_Context.GetDynamicIdentifiersDictionary();
+			foreach (var pair in dynamicIdentifiers)
 			{
 				TreeViewItem identifierNode = new()
 				{
@@ -189,6 +193,24 @@ namespace SLObjReader
 				};
 
 				dynamicIdentifiersNode.Items.Add(identifierNode);
+			}
+
+			// Build the type to file output branch
+			TreeViewItem typeToFileOutputNode = new()
+			{
+				Header = "Type to File Output"
+			};
+			contextNode.Items.Add(typeToFileOutputNode);
+
+			foreach (var pair in m_Context.GetTypeToOutputFileDictionary())
+			{
+				TreeViewItem typeNode = new()
+				{
+					Header = dynamicIdentifiers.GetValueOrDefault(pair.Key, "<Bad Symbol Hash>").Text,
+					Tag = pair.Value,
+				};
+
+				typeToFileOutputNode.Items.Add(typeNode);
 			}
 
 			treeView.Items.Add(contextNode);
